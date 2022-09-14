@@ -7,7 +7,7 @@
 
 ## Trainer  
 
-### 1. Instancier un enfant de la classe et override les méthodes get_outputs et get_preds_and_loss
+### 1. Instancier un enfant de la classe et override les méthodes get_preds_and_loss() et calculate_metrics()
 ```
 class TestTrainer(Trainer):
     def __init__(self,
