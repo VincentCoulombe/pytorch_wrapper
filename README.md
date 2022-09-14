@@ -80,7 +80,7 @@ Posibilité de sauvegarder le meilleur modèle en validation en spécifiant un p
 metrics = trainer.train(epochs=10, save_folder_path=".")
 ```
 
-Posibilité de spécifier le nom du modèle sauvegardé (sinon on prend un nom par défaut qui est la date et l'heure du début du training).
+Posibilité de spécifier le nom du modèle sauvegardé (défault = la date et l'heure du début du training).
 ```
 metrics = trainer.train(epochs=10, save_folder_path=".", save_name="test_model.pt")
 ```
@@ -92,9 +92,9 @@ metrics = trainer.train(epochs=10, patience=2)
  
 ### 4. Tester l'entraînement!
 
-Retourne un dict contenant les métriques pour chaque époques et celles de test.
+Retourne un dict contenant les métriques pour chaque époques ET celles de test.
 ```
-trainer.test(DataLoader(TestDataset(), batch_size=1, shuffle=True, pin_memory=False)))
+metrics = trainer.test(DataLoader(TestDataset(), batch_size=1, shuffle=True, pin_memory=False)))
 ```
 
 
