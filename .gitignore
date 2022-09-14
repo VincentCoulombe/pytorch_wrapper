@@ -1,4 +1,6 @@
-**/__pycache__/
+/__pycache__/
 .pytest_cache/
 checkpoints/
-pytorch_wrapper.egg-info/
+*.egg-info/
+.tox/
+.pytest_cache/
