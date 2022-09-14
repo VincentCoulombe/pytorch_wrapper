@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 import numpy as np
-from utils import *
+from .utils import *
 import datetime
 
 class Trainer():
