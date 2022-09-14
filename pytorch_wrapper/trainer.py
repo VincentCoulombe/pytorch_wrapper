@@ -65,12 +65,14 @@ class Trainer():
     
     def calculate_metrics(self,
                     predictions: torch.Tensor,
-                    labels: torch.Tensor) -> None:
+                    labels: torch.Tensor,
+                    phase: str) -> None:
         """ Calcul les métriques et les ajoutent à self.metrics.
 
         Args:
             predictions (torch.Tensor): Les prédictions du modèle sur les inputs.
             labels (torch.Tensor): Les labels des inputs.
+            phase (str): La phase d'entraînement (Train, Val ou Test).
 
         Raises:
             NotImplementedError: Cette méthode doit être implémentée par la classe fille.
@@ -107,7 +109,7 @@ class Trainer():
             running_loss += loss.item() * preds.size(0)
         self.metrics[f"{phase}_loss"].append(running_loss / len(self.dataloaders[phase]))
         if len(list(self.metrics.keys())) > 4:
-            self.calculate_metrics(preds, batch["labels"])
+            self.calculate_metrics(preds, batch["labels"], phase)
         if phase == "Val":
             if self.metrics["Val_loss"][-1] < self.best_loss:
                 print("Val loss passe de {:.4f} à {:.4f}".format(self.best_loss, self.metrics["Val_loss"][-1]))

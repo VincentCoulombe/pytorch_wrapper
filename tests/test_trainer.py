@@ -64,25 +64,28 @@ class TestTrainer(Trainer):
     
     def calculate_metrics(self,
                     predictions: torch.Tensor,
-                    labels: torch.Tensor) -> None:
+                    labels: torch.Tensor,
+                    phase: str) -> None:
         """ Calcul les métriques et les ajoutent à self.metrics.
 
         Args:
             predictions (torch.Tensor): Les prédictions du modèle sur les inputs.
             labels (torch.Tensor): Les labels des inputs.
+            phase (str): La phase d'entraînement (Train, Val ou Test).
 
         Raises:
             NotImplementedError: Cette méthode doit être implémentée par la classe fille.
 
         """
-        usable_predictions = predictions.detach().cpu().numpy()
-        usable_labels = labels.detach().cpu().numpy()
-        if "Test_accuracy" in list(self.metrics.keys()):
-            self.metrics["Test_accuracy"].append(accuracy_score(usable_predictions, usable_labels))
-        if "Test_F1" in list(self.metrics.keys()):
-            self.metrics["Test_F1"].append(f1_score(usable_predictions, usable_labels))
-        if "Test_recall" in list(self.metrics.keys()):
-            self.metrics["Test_recall"].append(recall_score(usable_predictions, usable_labels))
+        if phase == "Test":
+            usable_predictions = predictions.detach().cpu().numpy()
+            usable_labels = labels.detach().cpu().numpy()
+            if "Test_accuracy" in list(self.metrics.keys()):
+                self.metrics["Test_accuracy"].append(accuracy_score(usable_predictions, usable_labels))
+            if "Test_F1" in list(self.metrics.keys()):
+                self.metrics["Test_F1"].append(f1_score(usable_predictions, usable_labels))
+            if "Test_recall" in list(self.metrics.keys()):
+                self.metrics["Test_recall"].append(recall_score(usable_predictions, usable_labels))
     
 def test_creer_valid():
     
