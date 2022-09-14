@@ -1,7 +1,7 @@
 # pytorch_wrapper
 
 ## Comment l'installer?
-1. s'assurer d'avoir les requirements d'installés.
+1. S'assurer d'avoir les requirements d'installés.
 2. `pip install git+https://github.com/VincentCoulombe/pytorch_wrapper`
 3. `from pytorch_wrapper import *`
 
@@ -61,7 +61,7 @@ class TestTrainer(Trainer):
             self.metrics["Test_recall"].append(recall_score(usable_outputs, usable_labels))
 ```
 
-### 2. Ajouter des métriques à calculer dans calculate_metrics
+### 2. Ajouter des métriques qui seront calculés dans calculate_metrics
 
 Les métriques de base sont : Epoch, Train_loss, Val_loss, Test_loss
 ```
