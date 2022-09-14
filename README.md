@@ -63,7 +63,7 @@ class TestTrainer(Trainer):
                 self.metrics["Test_recall"].append(recall_score(usable_predictions, usable_labels))
 ```
 
-### 2. Ajouter des métriques qui seront calculés dans calculate_metrics
+### 2. Ajouter des métriques qui seront calculées dans calculate_metrics
 
 Les métriques de base sont : Epoch, Train_loss, Val_loss, Test_loss.
 ```
