@@ -2,10 +2,9 @@ import pytest
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
-import pandas as pd
-import numpy as np
 import os
 from sklearn.metrics import accuracy_score, f1_score, recall_score
+import os
 
 from trainer import *
 
@@ -37,44 +36,65 @@ class TestDataset(Dataset):
     
 class TestTrainer(Trainer):
     def __init__(self,
-                model,
-                dataloaders,
-                criterion,
-                optimizer,
-                scheduler,
-                verbose) -> None:
-        super().__init__(model, dataloaders, criterion, optimizer, scheduler, verbose)
+                 model: nn.Module,
+                 dataloaders: Dict[str, DataLoader],
+                 optimizer = torch.optim.AdamW,
+                 scheduler = None,
+                 verbose: bool = True) -> None:
+        super().__init__(model, dataloaders, optimizer, scheduler, verbose)
         
-    def get_outputs(self,
-                    inputs: torch.Tensor) -> torch.Tensor:
-        return self.model(inputs["input_ids"])
+    def get_preds_and_loss(self,
+                           batch: dict) -> tuple:
+        """ Retourne les prédictions du modèle et la loss en fonction des inputs de la batch (appel le forward du modèle).
+
+        Args:
+            batch (dict): Une batch du DataLoader, minimalement de la forme {'input_ids': tensor, 'labels': tensor}.
+
+        Raises:
+            NotImplementedError: Cette méthode doit être implémentée par la classe fille.
+
+        Returns:
+            tuple: (prédictions: torch.Tensor, loss: torch.Tensor).
+        """
+        outputs = self.model(batch['input_ids'])
+        predictions = torch.round(torch.sigmoid(outputs)) 
+        criterion = nn.CrossEntropyLoss()
+        return predictions, criterion(outputs, batch["labels"])
     
     
     def calculate_metrics(self,
-                outputs: torch.Tensor,
-                labels: torch.Tensor) -> None:
-        usable_outputs = outputs.detach().cpu().numpy().astype(int)
-        usable_labels = labels.detach().cpu().numpy().astype(int)
+                    predictions: torch.Tensor,
+                    labels: torch.Tensor) -> None:
+        """ Calcul les métriques et les ajoutent à self.metrics.
+
+        Args:
+            predictions (torch.Tensor): Les prédictions du modèle sur les inputs.
+            labels (torch.Tensor): Les labels des inputs.
+
+        Raises:
+            NotImplementedError: Cette méthode doit être implémentée par la classe fille.
+
+        """
+        usable_predictions = predictions.detach().cpu().numpy()
+        usable_labels = labels.detach().cpu().numpy()
         if "Test_accuracy" in list(self.metrics.keys()):
-            self.metrics["Test_accuracy"].append(accuracy_score(usable_outputs, usable_labels))
+            self.metrics["Test_accuracy"].append(accuracy_score(usable_predictions, usable_labels))
         if "Test_F1" in list(self.metrics.keys()):
-            self.metrics["Test_F1"].append(f1_score(usable_outputs, usable_labels))
+            self.metrics["Test_F1"].append(f1_score(usable_predictions, usable_labels))
         if "Test_recall" in list(self.metrics.keys()):
-            self.metrics["Test_recall"].append(recall_score(usable_outputs, usable_labels))
+            self.metrics["Test_recall"].append(recall_score(usable_predictions, usable_labels))
     
 def test_creer_valid():
     
     for scheduler in [VALID_SCHEDULER, None]:
         trainer = TestTrainer(VALID_MODEL,
                         VALID_LOADERS,
-                        VALID_CRITERION,
                         VALID_OPTIMIZER,
                         scheduler,
                         True)
         assert isinstance(trainer, Trainer)
         assert isinstance(trainer.model, nn.Module)
         assert isinstance(trainer.dataloaders, dict)
-        assert isinstance(trainer.criterion, (torch.nn.MSELoss, torch.nn.CrossEntropyLoss, torch.nn.KLDivLoss, torch.nn.BCEWithLogitsLoss))
         assert isinstance(trainer.optimizer, (torch.optim.AdamW, torch.optim.Adam))
         assert isinstance(trainer.scheduler, (torch.optim.lr_scheduler.ReduceLROnPlateau, type(None)))
         assert isinstance(trainer.verbose, bool)
@@ -84,15 +104,17 @@ def test_creer_invalid():
         with pytest.raises(TypeError):
             trainer = TestTrainer(VALID_MODEL,
                               invalid_loader,
-                              VALID_CRITERION,
                               VALID_OPTIMIZER,
                               VALID_SCHEDULER,
                               True)
             
 def test_train_valid():
+    
+    if os.path.exists(os.path.join(".", "checkpoints", "test_model.pt")):
+        os.remove(os.path.join(".", "checkpoints", "test_model.pt"))
+        
     trainer = TestTrainer(VALID_MODEL,
                 USABLE_LOADERS,
-                VALID_CRITERION,
                 VALID_OPTIMIZER,
                 None,
                 True)
@@ -102,10 +124,10 @@ def test_train_valid():
     assert len(trainer.metrics["Train_loss"]) == 2
     assert len(trainer.metrics["Epoch"]) == 2
     assert len(trainer.metrics["Test_loss"]) == 0
+    assert not os.path.exists(os.path.join(".", "checkpoints", "test_model.pt"))
     
     trainer = TestTrainer(VALID_MODEL,
             USABLE_LOADERS,
-            VALID_CRITERION,
             VALID_OPTIMIZER,
             VALID_SCHEDULER,
             True)
@@ -120,22 +142,26 @@ def test_train_valid():
     
     new_trainer = TestTrainer(model,
         USABLE_LOADERS,
-        VALID_CRITERION,
         VALID_OPTIMIZER,
         VALID_SCHEDULER,
         True)
     
-    new_trainer.train(epochs=25, save_folder_path=None)
-    assert len(new_trainer.metrics["Val_loss"]) == 25
-    assert len(new_trainer.metrics["Train_loss"]) == 25
-    assert len(new_trainer.metrics["Epoch"]) == 25
+    metrics = new_trainer.train(epochs=25, patience=5)
+    assert len(new_trainer.metrics["Val_loss"]) == 6
+    assert len(new_trainer.metrics["Train_loss"]) == 6
+    assert len(new_trainer.metrics["Epoch"]) == 6
     assert len(new_trainer.metrics["Test_loss"]) == 0
-    assert new_trainer.best_loss < trainer.best_loss
     
+    metrics = new_trainer.train(epochs=25, patience=2)
+    assert len(new_trainer.metrics["Val_loss"]) == 8
+    assert len(new_trainer.metrics["Train_loss"]) == 8
+    assert len(new_trainer.metrics["Epoch"]) == 8
+    assert len(new_trainer.metrics["Test_loss"]) == 0
+    
+     
 def test_add_metrics_keys_valid():
     trainer = TestTrainer(VALID_MODEL,
             USABLE_LOADERS,
-            VALID_CRITERION,
             VALID_OPTIMIZER,
             None,
             True)
@@ -153,7 +179,6 @@ def test_add_metrics_keys_valid():
 def test_add_metrics_keys_invalid():
     trainer = TestTrainer(VALID_MODEL,
             USABLE_LOADERS,
-            VALID_CRITERION,
             VALID_OPTIMIZER,
             None,
             True)
@@ -172,7 +197,6 @@ def test_test_valid():
     
     trainer = TestTrainer(model,
         USABLE_LOADERS_W_TEST,
-        VALID_CRITERION,
         VALID_OPTIMIZER,
         VALID_SCHEDULER,
         True)
@@ -205,9 +229,5 @@ USABLE_LOADERS_W_TEST = {"Train": DataLoader(TestDataset(), 8), "Val": DataLoade
 INVALID_KEY_LOADERS = {"Train": DataLoader(torch.rand(10, 4), 8), "Test": DataLoader(torch.rand(10, 4), 8)}
 INVALID_TRAIN_LOADER = {"Train": torch.rand(10, 4), "Val": DataLoader(torch.rand(10, 4), 8)}
 INVALID_VAL_LOADER = {"Train": DataLoader(torch.rand(10, 4), 8), "Val": torch.rand(10, 4)}
-VALID_CRITERION = torch.nn.MSELoss()
 VALID_OPTIMIZER = torch.optim.AdamW(VALID_MODEL.parameters())
 VALID_SCHEDULER  = torch.optim.lr_scheduler.ReduceLROnPlateau(VALID_OPTIMIZER)
-
-
-test_test_valid()

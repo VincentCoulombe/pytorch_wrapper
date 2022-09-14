@@ -14,18 +14,16 @@ class Trainer():
     def __init__(self,
                  model: nn.Module,
                  dataloaders: Dict[str, DataLoader],
-                 criterion: Union[torch.nn.MSELoss, torch.nn.CrossEntropyLoss, torch.nn.KLDivLoss, torch.nn.BCEWithLogitsLoss],
-                 optimizer: Union[torch.optim.AdamW, torch.optim.Adam],
-                 scheduler: Union[torch.optim.lr_scheduler.ReduceLROnPlateau, None],
+                 optimizer = torch.optim.AdamW,
+                 scheduler = None,
                  verbose: bool = True) -> None:
         """ Le Trainer peut entraîner et tester un modèle sur les données contenues dans dataloaders.
 
         Args:
             model (nn.Module): Le modèle à entraîner.
             dataloaders (Dict[str, DataLoader]): Les données d'entraînement, de validation et (optionnellement) de test.
-            criterion (Union[torch.nn.MSELoss, torch.nn.CrossEntropyLoss, torch.nn.KLDivLoss, torch.nn.BCEWithLogitsLoss]): La fonction de coût.
-            optimizer (Union[torch.optim.AdamW, torch.optim.Adam]): L'optimiseur.
-            scheduler (Union[torch.optim.lr_scheduler.ReduceLROnPlateau, None]): Le scheduler du learning_rate.
+            optimizer: L'optimiseur. Defaults to torch.optim.AdamW.
+            scheduler: Le scheduler du learning_rate.
             verbose (bool, optional): Si on affiche plus que le tqdm. Defaults to True.
 
         Raises:
@@ -44,35 +42,34 @@ class Trainer():
         
         self.model = model
         self.dataloaders = dataloaders
-        self.criterion = criterion
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.verbose = verbose
         self.best_loss = np.inf
         self.metrics = {"Epoch": [], "Train_loss": [], "Val_loss": [], "Test_loss": []}
         
-    def get_outputs(self,
-                    inputs: torch.Tensor) -> torch.Tensor:
-        """ Renvoie les logits du modèle sur les inputs de la batch (appel le forward du modèle).
+    def get_preds_and_loss(self,
+                           batch: dict) -> tuple:
+        """ Renvoit les prédictions du modèle et la loss en fonction des inputs de la batch (appel le forward du modèle).
 
         Args:
-            inputs (torch.Tensor): Les inputs de la batch sur lesquels le modèle doit faire des prédictions.
+            batch (dict): Une batch du DataLoader, minimalement de la forme {'input_ids': tensor, 'labels': tensor}.
 
         Raises:
             NotImplementedError: Cette méthode doit être implémentée par la classe fille.
 
         Returns:
-            torch.Tensor: Les logits du modèle sur les inputs.
+            tuple: (prédictions: torch.Tensor, loss: torch.Tensor).
         """
         raise NotImplementedError("Cette méthode n'est pas implémentée.")
     
     def calculate_metrics(self,
-                    outputs: torch.Tensor,
+                    predictions: torch.Tensor,
                     labels: torch.Tensor) -> None:
         """ Calcul les métriques et les ajoutent à self.metrics.
 
         Args:
-            outputs (torch.Tensor): Les logits du modèle sur les inputs.
+            predictions (torch.Tensor): Les prédictions du modèle sur les inputs.
             labels (torch.Tensor): Les labels des inputs.
 
         Raises:
@@ -83,7 +80,7 @@ class Trainer():
     
     def _run_epoch(self,
                    phase: str) -> None:
-                   
+           
         if phase == "Train":
             self.model.train()
         else:
@@ -97,17 +94,20 @@ class Trainer():
             if not isinstance(batch["labels"], torch.Tensor):
                 raise TypeError(f"La clée 'labels' ne retourne pas un tensor, elle retourne {type(batch['labels'])}.")
             batch = {key: value.to(self.device) for key, value in batch.items()}
-            self.optimizer.zero_grad()
             with torch.set_grad_enabled(phase == "Train"):
-                outputs = self.get_outputs(batch)
-                loss = self.criterion(outputs, batch["labels"])
+                preds, loss = self.get_preds_and_loss(batch)
+                if not isinstance(preds, torch.Tensor) or not isinstance(loss, torch.Tensor):
+                    raise TypeError(f"La méthode get_preds_and_loss doit retourner un tuple de deux tensors. Elle retourne {(type(preds), type(loss))}.")
+                if preds.size() != batch["labels"].size():
+                    raise ValueError(f'Les prédictions sont de taille {preds.size()} alors que les labels sont de taille {batch["labels"].size()}. Ils doivent êtres de taille identiques.')
                 if phase == "Train":
+                    self.optimizer.zero_grad()
                     loss.backward()
                     self.optimizer.step()
-            running_loss += loss.item() * outputs.size(0)
+            running_loss += loss.item() * preds.size(0)
         self.metrics[f"{phase}_loss"].append(running_loss / len(self.dataloaders[phase]))
         if len(list(self.metrics.keys())) > 4:
-            self.calculate_metrics(outputs, batch["labels"])
+            self.calculate_metrics(preds, batch["labels"])
         if phase == "Val":
             if self.metrics["Val_loss"][-1] < self.best_loss:
                 print("Val loss passe de {:.4f} à {:.4f}".format(self.best_loss, self.metrics["Val_loss"][-1]))
@@ -119,8 +119,10 @@ class Trainer():
                     torch.save(best_model_wts, os.path.join(self.save_path, self.SAVE_FOLDER, model_name))
             elif self.patience:
                 self.stagnation += 1
+                if self.verbose:
+                    print(f"Val loss n'a pas diminuée depuis {self.stagnation} epoch(s).")
                 if self.stagnation == self.patience:
-                    print(f"Stagnation depuis {self.patience} epochs. Fin de l'entraînement.")
+                    print(f"Early-stopping, car patience = {self.patience} et Val loss n'a pas diminuée depuis {self.stagnation} epoch(s).")
                     return
             if self.scheduler is not None:
                 self.scheduler.step(self.metrics[f"{phase}_loss"][-1])
@@ -166,15 +168,16 @@ class Trainer():
         self.save_path = save_folder_path
         self.save_name = save_name
         self.stagnation = 0
-        self.patience = patience
+        self.patience = -1 if patience is None else patience
         for epoch in range(epochs):
-            if self.verbose:
-                print("-" * 30)
-                print(f"Epoch {epoch+1}/{epochs}")
-                print_memory_usage(self.device)
-            self.metrics["Epoch"].append(epoch+1)
-            for phase in ["Train", "Val"]:
-                self._run_epoch(phase)
+            if self.stagnation != self.patience:
+                if self.verbose:
+                    print("-" * 30)
+                    print(f"Epoch {epoch+1}/{epochs}")
+                    print_memory_usage(self.device)
+                self.metrics["Epoch"].append(epoch+1)
+                for phase in ["Train", "Val"]:
+                    self._run_epoch(phase)
                
         duree = time.perf_counter() - since 
         if self.verbose:
