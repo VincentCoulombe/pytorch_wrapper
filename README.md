@@ -11,54 +11,53 @@
 ```
 class TestTrainer(Trainer):
     def __init__(self,
-                model, # nn.Module
-                dataloaders, # {'Train': Dataloader, 'Val': Dataloader}
-                criterion, # Loss function
-                optimizer, # Optimizer
-                scheduler, # Scheduler (Default = None)
-                verbose # Default = True
-                ) -> None:
-        super().__init__(model, dataloaders, criterion, optimizer, scheduler, verbose)
+                 model: nn.Module,
+                 dataloaders: Dict[str, DataLoader],
+                 optimizer = torch.optim.AdamW,
+                 scheduler = None,
+                 verbose: bool = True) -> None:
+        super().__init__(model, dataloaders, optimizer, scheduler, verbose)
         
-    def get_outputs(self,
-                    inputs: torch.Tensor) -> torch.Tensor:
-        """ Renvoie les logits du modèle sur les inputs de la batch (appel le forward du modèle).
+    def get_preds_and_loss(self,
+                           batch: dict) -> tuple:
+        """ Retourne les prédictions du modèle et la loss en fonction des inputs de la batch (appel le forward du modèle).
 
         Args:
-            inputs (torch.Tensor): Les inputs de la batch sur lesquels le modèle doit faire des prédictions.
+            batch (dict): Une batch du DataLoader, minimalement de la forme {'input_ids': tensor, 'labels': tensor}.
 
         Raises:
             NotImplementedError: Cette méthode doit être implémentée par la classe fille.
 
         Returns:
-            torch.Tensor: Les logits du modèle sur les inputs.
-        """           
-             
-        return self.model(inputs["input_ids"])
+            tuple: (prédictions: torch.Tensor, loss: torch.Tensor).
+        """
+        outputs = self.model(batch['input_ids'])
+        predictions = torch.round(torch.sigmoid(outputs)) 
+        criterion = nn.CrossEntropyLoss()
+        return predictions, criterion(outputs, batch["labels"])
     
     
     def calculate_metrics(self,
-                outputs: torch.Tensor,
-                labels: torch.Tensor) -> None:
-                
+                    predictions: torch.Tensor,
+                    labels: torch.Tensor) -> None:
         """ Calcul les métriques et les ajoutent à self.metrics.
 
         Args:
-            outputs (torch.Tensor): Les logits du modèle sur les inputs.
+            predictions (torch.Tensor): Les prédictions du modèle sur les inputs.
             labels (torch.Tensor): Les labels des inputs.
 
         Raises:
             NotImplementedError: Cette méthode doit être implémentée par la classe fille.
 
-        """        
-        usable_outputs = outputs.detach().cpu().numpy().astype(int)
-        usable_labels = labels.detach().cpu().numpy().astype(int)
+        """
+        usable_predictions = predictions.detach().cpu().numpy()
+        usable_labels = labels.detach().cpu().numpy()
         if "Test_accuracy" in list(self.metrics.keys()):
-            self.metrics["Test_accuracy"].append(accuracy_score(usable_outputs, usable_labels))
+            self.metrics["Test_accuracy"].append(accuracy_score(usable_predictions, usable_labels))
         if "Test_F1" in list(self.metrics.keys()):
-            self.metrics["Test_F1"].append(f1_score(usable_outputs, usable_labels))
+            self.metrics["Test_F1"].append(f1_score(usable_predictions, usable_labels))
         if "Test_recall" in list(self.metrics.keys()):
-            self.metrics["Test_recall"].append(recall_score(usable_outputs, usable_labels))
+            self.metrics["Test_recall"].append(recall_score(usable_predictions, usable_labels))
 ```
 
 ### 2. Ajouter des métriques qui seront calculés dans calculate_metrics
