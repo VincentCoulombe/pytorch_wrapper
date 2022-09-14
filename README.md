@@ -1,5 +1,5 @@
 # pytorch_wrapper
-
+![Tests](https://github.com/VincentCoulombe/pytorch_wrapper/actions/workflows/tests.yml/badge.svg)
 ## Comment l'installer?
 1. S'assurer d'avoir les requirements d'installés.
 2. `pip install git+https://github.com/VincentCoulombe/pytorch_wrapper`
