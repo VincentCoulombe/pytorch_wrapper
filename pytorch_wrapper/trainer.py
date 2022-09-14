@@ -1,10 +1,10 @@
 import time, copy
 import os
 from typing import Any, Dict, List, Union
-from tqdm import tqdm
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 import numpy as np
 from .utils import *
 import datetime
