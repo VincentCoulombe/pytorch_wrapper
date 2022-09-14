@@ -7,7 +7,7 @@
 
 ## Trainer  
 
-### 1. Instancier un enfant de la classe et override les méthodes get_outputs et calculate_metrics
+### 1. Instancier un enfant de la classe et override les méthodes get_outputs et get_preds_and_loss
 ```
 class TestTrainer(Trainer):
     def __init__(self,
@@ -62,14 +62,14 @@ class TestTrainer(Trainer):
 
 ### 2. Ajouter des métriques qui seront calculés dans calculate_metrics
 
-Les métriques de base sont : Epoch, Train_loss, Val_loss, Test_loss
+Les métriques de base sont : Epoch, Train_loss, Val_loss, Test_loss.
 ```
 trainer.add_metrics_keys(["Test_accuracy", "Test_F1", "Test_recall"])
 ```
 
 ### 3. Lancer l'entraînement!
 
-Retourne un dict contenant les métriques pour chaque époques.
+Retourne un dict contenant les métriques (Epoch, Train_loss, Val_loss) pour chaque époques.
 ```
 metrics = trainer.train(epochs=2)
 ```
@@ -84,14 +84,14 @@ Posibilité de spécifier le nom du modèle sauvegardé (défault = la date et l
 metrics = trainer.train(epochs=10, save_folder_path=".", save_name="test_model.pt")
 ```
 
-Posibilité de faire du early-stopping en passant une patiance en paramètre.
+Posibilité de faire du early-stopping en passant une patience en paramètre.
 ```
-metrics = trainer.train(epochs=10, patience=2)
+metrics = trainer.train(epochs=10, , save_folder_path=".", save_name="test_model.pt", patience=2)
 ```
  
 ### 4. Tester l'entraînement!
 
-Retourne un dict contenant les métriques pour chaque époques ET celles de test.
+Retourne un dict contenant les métriques (Epoch, Train_loss, Val_loss) pour chaque époques ET un Test_loss.
 ```
 metrics = trainer.test(DataLoader(TestDataset(), batch_size=1, shuffle=True, pin_memory=False)))
 ```
