@@ -6,7 +6,7 @@ import os
 from sklearn.metrics import accuracy_score, f1_score, recall_score
 import os
 
-from trainer import *
+from pytorch_wrapper.trainer import *
 
 class TestModel(nn.Module):
     
