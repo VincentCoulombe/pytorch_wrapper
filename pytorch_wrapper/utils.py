@@ -4,8 +4,7 @@ from typing import Dict, List, Union
 def print_memory_usage(device) -> None:
     
     if device == torch.device("cuda"):
-        memoire_disponible = round(torch.cuda.max_memory_reserved()*1e-9,3)
-        memoire_utilisee = round(torch.cuda.max_memory_allocated()*1e-9,3)
+        memoire_utilisee, memoire_disponible = torch.cuda.mem_get_info()
         if memoire_disponible == 0:
             print("Aucune mémoire GPU de disponible.")
         else:
