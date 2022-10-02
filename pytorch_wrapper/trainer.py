@@ -14,7 +14,7 @@ class Trainer():
     def __init__(self,
                  model: nn.Module,
                  dataloaders: Dict[str, DataLoader],
-                 optimizer = torch.optim.AdamW,
+                 optimizer,
                  scheduler = None,
                  verbose: bool = True) -> None:
         """ Le Trainer peut entraîner et tester un modèle sur les données contenues dans dataloaders.
@@ -22,7 +22,7 @@ class Trainer():
         Args:
             model (nn.Module): Le modèle à entraîner.
             dataloaders (Dict[str, DataLoader]): Les données d'entraînement, de validation et (optionnellement) de test.
-            optimizer: L'optimiseur. Defaults to torch.optim.AdamW.
+            optimizer: L'optimiseur.
             scheduler: Le scheduler du learning_rate.
             verbose (bool, optional): Si on affiche plus que le tqdm. Defaults to True.
 
@@ -88,6 +88,8 @@ class Trainer():
         else:
             self.model.eval()
         running_loss = 0
+        epoch_preds = []
+        epoch_labels = []
         for batch in tqdm(self.dataloaders[phase]):
             if not isinstance(batch, dict) or "input_ids" not in batch or "labels" not in batch:
                 raise TypeError("un next(iter(dataloader)) doit retourner un dictionnaire de la forme {'input_ids': tensor, 'labels': tensor}. Pas {}.".format(batch))
@@ -107,9 +109,11 @@ class Trainer():
                     loss.backward()
                     self.optimizer.step()
             running_loss += loss.item() * preds.size(0)
+            epoch_preds = [*epoch_preds, *preds.detach().cpu().numpy().tolist()]
+            epoch_labels = [*epoch_labels, *batch["labels"].detach().cpu().numpy().tolist()]
         self.metrics[f"{phase}_loss"].append(running_loss / len(self.dataloaders[phase]))
         if len(list(self.metrics.keys())) > 4:
-            self.calculate_metrics(preds, batch["labels"], phase)
+            self.calculate_metrics(epoch_preds, epoch_labels, phase)
         if phase == "Val":
             if self.metrics["Val_loss"][-1] < self.best_loss:
                 print("Val loss passe de {:.4f} à {:.4f}".format(self.best_loss, self.metrics["Val_loss"][-1]))

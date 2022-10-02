@@ -37,10 +37,19 @@ class TestDataset(Dataset):
 class TestTrainer(Trainer):
     def __init__(self,
                  model: nn.Module,
-                 dataloaders: Dict[str, DataLoader],
-                 optimizer = torch.optim.AdamW,
+                 dataloaders,
+                 optimizer,
                  scheduler = None,
                  verbose: bool = True) -> None:
+        """ Initialise la classe Trainer.
+
+        Args:
+            model (nn.Module): Un Modèle PyTorch.
+            dataloaders (Dict[str: Dataloaders]): Un dictionnaire contenant MINIMALEMENT {'Train': Dataloader, 'Val': Dataloader}
+            optimizer (Any): Un optimiseur PyTorch.
+            scheduler (Any, optional): Un scheduler PyTorch. Defaults to None.
+            verbose (bool, optional): Verbose. Defaults to True.
+        """
         super().__init__(model, dataloaders, optimizer, scheduler, verbose)
         
     def get_preds_and_loss(self,
@@ -63,29 +72,32 @@ class TestTrainer(Trainer):
     
     
     def calculate_metrics(self,
-                    predictions: torch.Tensor,
-                    labels: torch.Tensor,
+                    predictions: list,
+                    labels: list,
                     phase: str) -> None:
         """ Calcul les métriques et les ajoutent à self.metrics.
 
         Args:
-            predictions (torch.Tensor): Les prédictions du modèle sur les inputs.
-            labels (torch.Tensor): Les labels des inputs.
+            predictions (torch.Tensor): Les prédictions du modèle sur tous les inputs d'un epoch.
+            labels (torch.Tensor): Les labels de tous les inputs d'un epoch.
             phase (str): La phase d'entraînement (Train, Val ou Test).
 
         Raises:
             NotImplementedError: Cette méthode doit être implémentée par la classe fille.
 
         """
-        if phase == "Test":
-            usable_predictions = predictions.detach().cpu().numpy()
-            usable_labels = labels.detach().cpu().numpy()
-            if "Test_accuracy" in list(self.metrics.keys()):
-                self.metrics["Test_accuracy"].append(accuracy_score(usable_predictions, usable_labels))
-            if "Test_F1" in list(self.metrics.keys()):
-                self.metrics["Test_F1"].append(f1_score(usable_predictions, usable_labels))
-            if "Test_recall" in list(self.metrics.keys()):
-                self.metrics["Test_recall"].append(recall_score(usable_predictions, usable_labels))
+        if phase != "Test":
+            return
+        if "Test_accuracy" in list(self.metrics.keys()):
+            self.metrics["Test_accuracy"].append(accuracy_score(predictions, labels))
+        if "Test_F1" in list(self.metrics.keys()):
+            self.metrics["Test_F1"].append(f1_score(predictions, labels))
+        if "Test_recall" in list(self.metrics.keys()):
+            self.metrics["Test_recall"].append(recall_score(predictions, labels))
+        if "Test_predictions" in list(self.metrics.keys()):
+            self.metrics["Test_predictions"].extend(predictions)
+        if "Test_labels" in list(self.metrics.keys()):
+            self.metrics["Test_labels"].extend(labels)
     
 def test_creer_valid():
     
@@ -213,9 +225,9 @@ def test_test_valid():
     assert len(trainer.metrics["Val_loss"]) == 0
     assert len(trainer.metrics["Train_loss"]) == 0
     assert len(trainer.metrics["Epoch"]) == 0
-    trainer.add_metrics_keys(["Test_F1", "Test_recall"])
+    trainer.add_metrics_keys(["Test_F1", "Test_recall", "Test_predictions", "Test_labels"])
     trainer.test(DataLoader(TestDataset(), 8))
-    assert list(trainer.metrics.keys()) == ["Epoch", 'Train_loss', 'Val_loss', 'Test_loss', 'Test_accuracy', "Test_F1", "Test_recall"]
+    assert list(trainer.metrics.keys()) == ["Epoch", 'Train_loss', 'Val_loss', 'Test_loss', 'Test_accuracy', "Test_F1", "Test_recall", "Test_predictions", "Test_labels"]
     assert len(trainer.metrics["Test_F1"]) == 1
     assert len(trainer.metrics["Test_recall"]) == 1
     assert len(trainer.metrics["Test_accuracy"]) == 2
@@ -223,6 +235,9 @@ def test_test_valid():
     assert len(trainer.metrics["Val_loss"]) == 0
     assert len(trainer.metrics["Train_loss"]) == 0
     assert len(trainer.metrics["Epoch"]) == 0
+    assert len(trainer.metrics["Test_predictions"]) == TestDataset().__len__()
+    assert len(trainer.metrics["Test_labels"]) == TestDataset().__len__()
+    assert trainer.metrics["Test_labels"] == TestDataset().labels.tolist()
     
 
 VALID_MODEL = TestModel()
