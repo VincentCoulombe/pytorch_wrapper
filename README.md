@@ -89,7 +89,7 @@ metrics = trainer.train(epochs=10, save_folder_path=".", save_name="test_model.p
 
 Posibilité de faire du early-stopping en passant une patience en paramètre.
 ```
-metrics = trainer.train(epochs=10, , save_folder_path=".", save_name="test_model.pt", patience=2)
+metrics = trainer.train(epochs=10, save_folder_path=".", save_name="test_model.pt", patience=2)
 ```
  
 ### 4. Tester l'entraînement!
