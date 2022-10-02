@@ -40,7 +40,7 @@ class Trainer():
         if not isinstance(dataloaders["Val"], DataLoader):
             raise TypeError(f"dataloaders['Val'] doit être un Dataloader. Pas un {type(dataloaders['Val'])}.")
             
-        self.model = model.cuda() if self.device == "cuda" else model
+        self.model = model.to(self.device)
         self.dataloaders = dataloaders
         self.optimizer = optimizer
         self.scheduler = scheduler
